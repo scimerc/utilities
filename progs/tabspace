@@ -1,0 +1,12 @@
+#!/usr/bin/env perl
+use strict;
+use warnings;
+
+$^I = '.bak';  # Call for in-place editing; make backups with a .bak suffix
+
+while ( <> )
+{
+    s/[ \t]+/\t/g;
+    print;
+}
+

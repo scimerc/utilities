@@ -1,0 +1,101 @@
+#!/usr/bin/perl
+# extract genotype information for the specified SNP(s) from a snptest input formatted data file;
+# the output file has two columns: the PN and the probability of occurrence of one of the alleles;
+# notes: the program assumes the entries in the data file to be in the same order as the PNs;
+# SNP names may not contain semicolons as these are used to separate them (see usage);
+use strict;
+use warnings;
+use lib '/cluster/projects/p33/groups/biostat/software/lib/perl';
+use opt_manager;
+use toolz;
+
+my $Njunk = 5;
+my $Ngenotypes = 3;
+
+if ( scalar @ARGV > 1 )
+{
+	my $goflag = 0;
+	foreach my $arg ( @ARGV )
+	{
+		if ( $arg =~ /-(.*)=(.*)/ )
+		{
+			$goflag = 1 if ( $arg =~ /-snp=(.+)/ );
+		}
+	}
+	if ( $goflag )
+	{
+		opt_manager::read ( @ARGV );
+		my $snps = opt_manager::get ( 'snp' );
+		my @snpsarr = split ( ";", $snps, -1 );
+		unless ( opt_manager::get ( 'infile' ) eq '' )
+		{
+			my $pnfile = opt_manager::get ( 'infile' );
+			open ( my $fh, '<', $pnfile ) or die "\n${pnfile}: $!\n";
+			my @pns = <$fh>;
+			for ( my $i = 0; $i < scalar @pns; $i++ )
+			{
+				chomp $pns[$i];
+			}
+			close $fh;
+			my $datafile = opt_manager::get ( 'datafile' );
+			unless ( $datafile eq '' )
+			{
+				my $dh;
+				open ( $dh, '<', "${datafile}" ) or die "\n${datafile}: $!\n";
+				while ( my $line = <$dh> )
+				{
+					chomp $line;
+					foreach my $snp ( @snpsarr )
+					{
+						if ( $line =~ / ${snp} / )
+						{
+							my $PNindex = 0;
+							my @info = split ( " ", $line, -1 );
+							for ( my $index = $Njunk; $index < scalar ( @info ); $index += $Ngenotypes )
+							{
+								my $total_alleles = 0.;
+								my $allele_probability = 0.;
+								for ( my $subindex = 0; $subindex < $Ngenotypes; $subindex++ )
+								{
+									$total_alleles += $info [ $index + $subindex ];
+									$allele_probability += $subindex * $info [ $index + $subindex ];
+								}
+								$allele_probability = -9. if ( $total_alleles == 0. );
+								$pns[$PNindex] .= "\t$allele_probability";
+								$PNindex++;
+							}
+						}
+					}
+				}
+				foreach my $entry ( @pns )
+				{
+					print "${entry}\n";
+				}
+				close $dh;
+			}
+			else
+			{
+				print "\nno data file specified.\n";
+			}
+		}
+		else
+		{
+			print "\nno person file specified.\n";
+		}
+	}
+	else
+	{
+		print ( "\nno SNP specified.\n" );
+	}
+}
+else
+{
+	print ( "\n you may have neglected to provide some input.\n\n " );
+	print ( toolz::pathless ( $0 ) . " extract genotypes for the specified SNP(s) from a snptest input data file." );
+	print ( "\n the output has as many fields as the number of specified SNP(s): the PN and the 'probability' [0,2]" );
+    print ( "\n of occurrence of one of the alleles;" );
+	print ( "\n notes:\n\t- the program assumes the entries in the data file to be in the same order as the PNs;" );
+	print ( "\n \t- SNP names may not contain semicolons as these are used to separate them (see usage);\n" );
+	print ( "\n  usage: " . toolz::pathless ( $0 ) . " -SNP=SNP1[;SNP2;...] -datafile=<datafile> -infile=<PNfile>\n\n" );
+}
+

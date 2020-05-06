@@ -1,0 +1,80 @@
+#!/usr/bin/env Rscript
+snptest.out <- read.table ( "stdin", header=TRUE )
+source ( "/cluster/projects/p33/groups/biostat/software/lib/R/ConfInterval.R" )
+snptest.out$N_cases <- snptest.out$cases_AA + snptest.out$cases_AB + snptest.out$cases_BB
+snptest.out$N_controls <- snptest.out$controls_AA + snptest.out$controls_AB + snptest.out$controls_BB
+snptest.out$N_all <- snptest.out$N_cases + snptest.out$N_controls
+snptest.out$N_A_cases <- 2*snptest.out$cases_AA + snptest.out$cases_AB
+snptest.out$N_B_cases <- 2*snptest.out$cases_BB + snptest.out$cases_AB
+snptest.out$N_A_controls <- 2*snptest.out$controls_AA + snptest.out$controls_AB
+snptest.out$N_B_controls <- 2*snptest.out$controls_BB + snptest.out$controls_AB
+snptest.out$freq_A_cases <- snptest.out$N_A_cases / ( 2*snptest.out$N_cases )
+snptest.out$freq_B_cases <- snptest.out$N_B_cases / ( 2*snptest.out$N_cases )
+snptest.out$freq_A_controls <- snptest.out$N_A_controls / ( 2*snptest.out$N_controls )
+snptest.out$freq_B_controls <- snptest.out$N_B_controls / ( 2*snptest.out$N_controls )
+snptest.out$freq_A_all <- ( snptest.out$N_A_cases + snptest.out$N_A_controls ) / ( 2*snptest.out$N_all )
+snptest.out$freq_B_all <- ( snptest.out$N_B_cases + snptest.out$N_B_controls ) / ( 2*snptest.out$N_all )
+ifelse (
+	snptest.out$bin1_frequentist_add_sex_score_beta_1 > 0,
+	as.character ( snptest.out$allele_B ),
+	as.character ( snptest.out$allele_A )
+) -> risk_allele
+ifelse (
+	snptest.out$bin1_frequentist_add_sex_score_beta_1 > 0,
+	as.character ( snptest.out$allele_A ),
+	as.character ( snptest.out$allele_B )
+) -> non_risk_allele
+ifelse (
+	snptest.out$bin1_frequentist_add_sex_score_beta_1 > 0,
+	as.double ( snptest.out$freq_B_cases ),
+	as.double ( snptest.out$freq_A_cases )
+) -> risk_allele_freq_cases
+ifelse (
+	snptest.out$bin1_frequentist_add_sex_score_beta_1 > 0,
+	as.double ( snptest.out$freq_B_controls ),
+	as.double ( snptest.out$freq_A_controls )
+) -> risk_allele_freq_controls
+ifelse (
+	snptest.out$bin1_frequentist_add_sex_score_beta_1 > 0,
+	as.double ( snptest.out$freq_B_all ),
+	as.double ( snptest.out$freq_A_all )
+) -> risk_allele_freq_all
+snptest.out$risk_allele <- risk_allele
+snptest.out$non_risk_allele <- non_risk_allele
+snptest.out$risk_allele_freq_cases <- risk_allele_freq_cases
+snptest.out$risk_allele_freq_controls <- risk_allele_freq_controls
+snptest.out$risk_allele_freq_all <- risk_allele_freq_all
+snptest.out$odds_ratio <- exp ( Mod ( snptest.out$bin1_frequentist_add_sex_score_beta_1 ) )
+ci <- computePConfidenceInterval ( snptest.out$odds_ratio, snptest.out$bin1_frequentist_add_sex_score_pvalue )
+snptest.out$odds_ratio_lower_limit <- ci[,1]
+snptest.out$odds_ratio_upper_limit <- ci[,2]
+id.vector = c (
+	"rsid",
+	"risk_allele",
+	"non_risk_allele",
+	"odds_ratio",
+	"odds_ratio_lower_limit",
+	"odds_ratio_upper_limit",
+	"N_all",
+	"risk_allele_freq_all",
+	"N_cases",
+	"risk_allele_freq_cases",
+	"N_controls",
+	"risk_allele_freq_controls",
+	"bin1_frequentist_add_sex_score_info",
+	"bin1_frequentist_add_sex_score_pvalue_gc",
+	"cohort_1_hwe",
+	"cases_hwe",
+	"controls_hwe",
+	"average_maximum_posterior_call",
+	"pos"
+)
+snptest.parsed.out <- snptest.out [ id.vector ]
+write.table (
+	snptest.parsed.out,
+	file = "",
+	quote = FALSE,
+	row.names = FALSE,
+	col.names = FALSE
+)
+

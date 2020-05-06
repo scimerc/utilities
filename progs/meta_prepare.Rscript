@@ -1,0 +1,115 @@
+#!/usr/bin/env Rscript
+exitstatus <- 0
+all.pns <- vector ()
+affected.files <- list ()
+affected.list <- array ()
+control.files <- list ()
+control.list <- array ()
+gc.files <- ""
+opt.vector <- vector ()
+fileprefix <- "meta"
+Ngroups <- 0
+args <- commandArgs ( TRUE )
+if ( length ( args ) > 0 ) {
+	args.index.vector <- 1 : length ( args )
+	prefix.index.vector <- args.index.vector [ args == "--pre" ]
+	if ( length ( prefix.index.vector ) > 0 ) {
+		fileprefix <- args [ prefix.index.vector [ length ( prefix.index.vector ) ] + 1 ]
+		opt.vector <- prefix.index.vector
+	}
+	group.index.vector <- args.index.vector [ args == "--g" ]
+	if ( length ( group.index.vector ) > 0 ) {
+		group.names <- args [ group.index.vector + 1 ]
+		affected.files <- args [ group.index.vector + 2 ]
+		control.files <- args [ group.index.vector + 3 ]
+		gc.files <- args [ group.index.vector + 4 ]
+		Ngroups <- length ( group.names )
+		opt.vector <- c (
+			opt.vector,
+			group.index.vector + 1,
+			group.index.vector + 2,
+			group.index.vector + 3,
+			group.index.vector + 4,
+			group.index.vector
+		)
+	}
+	if ( length ( affected.files ) != Ngroups || length ( control.files ) != Ngroups || length ( gc.files ) != Ngroups ) {
+		cat ( "\ngroup sizes do not match.\n" )
+		q ( status = 1, save = "no" )
+	} else {
+		i=1
+		for ( current in gc.files ) {
+			load ( current )
+			pheno.names <- colnames ( genomic.correction.x )
+			if ( i == 1 ) {
+				marker.names <- rownames ( genomic.correction.x )
+				marker.tags <- paste ( substr ( marker.names, 0, regexpr ( " ", marker.names ) - 1 ), "fw", sep = "" )
+				write.table ( 
+					t ( c ( "PN", group.names ) ), 
+					file = paste ( fileprefix, "pop", sep = "." ), 
+					row.names = F,
+					col.names = F,
+					quote = F
+				)
+			} else {
+				if ( any ( marker.names != rownames ( genomic.correction.x ) ) ) {
+					cat ( "\nerror: marker name mismatch.\n" )
+					q ( status = 1, save = "no" )
+				}
+			}
+			current.affected <- read.table ( affected.files[i], header=F, sep="\t" )
+			current.control <- read.table ( control.files[i], header=F, sep="\t" )
+			current.group <- c ( as.character ( current.affected$V1 ), as.character ( current.control$V1 ) )
+			current.poptable <- array (
+				rep ( c ( "X", ifelse ( 1 : Ngroups == i, 1, 0 ) ), each = length ( current.group ) ),
+				dim = c ( length ( current.group ), Ngroups + 1 )
+			)
+			current.poptable [, 1] <- current.group
+			write.table (
+				current.poptable,
+				file = paste ( fileprefix, "pop", sep = "." ),
+				append = T,
+				row.names = F,
+				col.names = F,
+				quote = F
+			)
+			for ( pheno in pheno.names ) {
+				current.table <- array (
+					rep ( c ( "X", 1 / genomic.correction.x [, pheno] ), each = length ( current.group ) ), 
+					dim = c ( length ( current.group ), length ( marker.names ) + 1 )
+				)
+				current.table [, 1] <- current.group
+				if ( i == 1 ) write.table ( 
+					t ( c ( "PN", marker.tags ) ), 
+					file = paste ( fileprefix, pheno, "fw", sep = "." ),
+					row.names = F,
+					col.names = F,
+					quote = F
+				)
+				write.table ( 
+					current.table, 
+					file = paste ( fileprefix, pheno, "fw", sep = "." ), 
+					append = T, 
+					row.names = F, 
+					col.names = F,
+					quote = F
+				)
+			}
+			i <- i+1
+		}
+	}
+} else {
+	cat ( "\nyou may have neglected to provide some input.\n" )
+	cat ( "\n usage:\n" )
+	cat ( "\n  meta_prepare.sh [--pre <prefix>] --g <name> <affected> <control> <gc> [--g ...]\n" )
+	cat ( "\n  where:\n" )
+	cat ( "    <prefix>    file output prefix\n" )
+	cat ( "    <name>      group name (to be used in the population file)\n" )
+	cat ( "    <affected>  list of affected in the group\n" )
+	cat ( "    <control>   list of control in the group\n" )
+	cat ( "    <gc>        genomic correction factors (R data file) for the group\n" )
+	cat ( "\n  Note: entries after each '--g' are strictly positional.\n" )
+	cat ( "\n" )
+}
+q ( status = exitstatus )
+

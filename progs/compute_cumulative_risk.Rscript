@@ -1,0 +1,37 @@
+#!/usr/bin/env Rscript
+# this script computes cumulative risks and performs T-tests like 'run_t-test.Rscript',
+# but in a different context, with snptest output files and a single genotype file;
+# it also fits a generalized linear model of status ~ cumulative effect
+suppressPackageStartupMessages ( library ( optparse ) )
+my_option_list <- list (
+	make_option ( 
+        c ( "-g", "--genotype" ),
+        dest = "genotype",
+        action = "store",
+        default = "gen.sorted.perfect_yield.risk.four",
+		help = paste ( 
+            "multi-genotype file with format <id> <p1> <p2> <p3> ... <pN>,",
+            "where <p*> are pseudo allele counts, and N is the number of PNs",
+            sep = "\n           "
+        )
+	),
+	make_option ( 
+        c ( "-r", "--beta" ),
+        dest = "beta",
+        action = "store",
+        default = "",
+		help = paste ( 
+            "effect size file: <id> <beta>",
+            sep = "\n           "
+        )
+	)
+)
+opt <- parse_args ( OptionParser ( option_list = my_option_list ) )
+if ( opt$oddsratio == "" ) {
+    cat ( "no effect size file specified.\n" ) ; q ( status = 0, save = "no" )
+} else {
+    log.odds.file <- read.table ( opt$beta, header = T )
+    log.odds.ratio <- log.odds.file$V2
+}
+gen.data <- read.table ( opt$genotype )
+gen.data.pgs <- colSums( gen.data[, 4 : length( names( gen.data.pgs ) ) ] * log.odds.ratio )

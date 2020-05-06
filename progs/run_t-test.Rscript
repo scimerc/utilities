@@ -1,0 +1,49 @@
+#!/usr/bin/env Rscript
+suppressPackageStartupMessages ( library ( optparse ) )
+exitstatus <- 0
+my_option_list <- list (
+	make_option ( c ( "-v", "--verbose" ), dest = "verbose", action = "store_true", default = FALSE,
+		help = "print stuff [default]."
+	),
+	make_option ( c ( "-a", "--affected" ), dest = "affected", action = "store", default = "",
+		help = "multi-genotype file for affected."
+	),
+	make_option ( c ( "-c", "--control" ), dest = "control", action = "store", default = "",
+		help = "multi-genotype file for controls."
+	),
+	make_option ( c ( "-o", "--oddsratio" ), dest = "oddsratio", action = "store", default = "",
+		help = paste ( 
+            "odds-ratio file: should contain as many lines as there are columns",
+            "of genotype info in the multi-genotype files.", sep = "\n"
+        )
+	)
+)
+opt <- parse_args ( OptionParser ( option_list = my_option_list ) )
+if ( opt$affected == "" ) {
+	print ( "no affected genotype file specified." )
+	q ( status = 0, save = "no" )
+}
+if ( opt$control == "" ) {
+	print ( "no control genotype file specified." )
+	q ( status = 0, save = "no" )
+}
+read.table ( opt$affected ) -> gen.affected.multi.data
+read.table ( opt$control ) -> gen.control.multi.data
+gen.affected.multi.data [, 2 : dim ( gen.affected.multi.data ) [2] ] -> prob.affected.data
+gen.control.multi.data [, 2 : dim ( gen.control.multi.data ) [2] ] -> prob.control.data
+rep ( 0., times = dim ( prob.control.data ) [2] ) -> log.odds.ratio
+if ( opt$oddsratio != "" ) {
+	read.table ( opt$oddsratio ) -> odds.ratio
+	log ( odds.ratio [,1] ) -> log.odds.ratio
+}
+if ( length ( log.odds.ratio ) == dim ( prob.control.data ) [2] ) {
+	as.matrix ( prob.affected.data ) %*% as.vector ( log.odds.ratio ) -> log.affected.data
+	as.matrix ( prob.control.data ) %*% as.vector ( log.odds.ratio ) -> log.control.data
+	mean ( log.affected.data )
+	mean ( log.control.data )
+	t.test ( log.affected.data, log.control.data )
+} else {
+	print ( "genotype/oddsratio entries mismatch." )
+	exitstatus <- 1
+}
+q ( status = exitstatus, save = "no" )

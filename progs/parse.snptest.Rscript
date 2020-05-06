@@ -1,0 +1,45 @@
+#!/usr/bin/env Rscript
+snptest.out <- read.table ( "stdin", header=TRUE )
+snptest.out$N_cases <- snptest.out$cases_AA + snptest.out$cases_AB + snptest.out$cases_BB
+snptest.out$N_controls <- snptest.out$controls_AA + snptest.out$controls_AB + snptest.out$controls_BB
+snptest.out$freq_A_cases <- ( 2*snptest.out$cases_AA + snptest.out$cases_AB ) / ( 2*snptest.out$N_cases )
+snptest.out$freq_B_cases <- ( 2*snptest.out$cases_BB + snptest.out$cases_AB ) / ( 2*snptest.out$N_cases )
+snptest.out$freq_A_controls <- ( 2*snptest.out$controls_AA + snptest.out$controls_AB ) / ( 2*snptest.out$N_controls )
+snptest.out$freq_B_controls <- ( 2*snptest.out$controls_BB + snptest.out$controls_AB ) / ( 2*snptest.out$N_controls )
+ifelse (
+	snptest.out$bin1_frequentist_add_score_beta_1 > 0,
+	as.character ( snptest.out$allele_B ),
+	as.character ( snptest.out$allele_A )
+) -> risk_allele
+ifelse (
+	snptest.out$bin1_frequentist_add_score_beta_1 > 0,
+	as.double ( snptest.out$freq_B_cases ),
+	as.double ( snptest.out$freq_A_cases )
+) -> risk_allele_freq_cases
+ifelse (
+	snptest.out$bin1_frequentist_add_score_beta_1 > 0,
+	as.double ( snptest.out$freq_B_controls ),
+	as.double ( snptest.out$freq_A_controls )
+) -> risk_allele_freq_controls
+snptest.out$risk_allele <- risk_allele
+snptest.out$risk_allele_freq_cases <- risk_allele_freq_cases
+snptest.out$risk_allele_freq_controls <- risk_allele_freq_controls
+snptest.out$odds_ratio <- exp ( Mod ( snptest.out$bin1_frequentist_add_score_beta_1 ) )
+name.vector = c (
+	"rsid",
+	"risk_allele",
+	"bin1_frequentist_add_score_pvalue",
+	"odds_ratio",
+	"N_cases",
+	"risk_allele_freq_cases",
+	"N_controls",
+	"risk_allele_freq_controls",
+	"cases_hwe",
+	"controls_hwe",
+	"bin1_frequentist_add_score_info"
+)
+write.table (
+	snptest.out [ name.vector ],
+	file = "", quote = FALSE, row.names = FALSE
+)
+

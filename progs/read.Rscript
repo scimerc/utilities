@@ -1,0 +1,27 @@
+#!/usr/bin/env Rscript
+
+opt.vector <- vector ()
+n <- 12
+myArgs <- commandArgs ( TRUE )
+if ( length ( myArgs ) > 0 ) {
+    myArgs.index.vector <- 1 : length ( myArgs )
+    index.vector <- myArgs.index.vector [ myArgs == "-n" ]
+    if ( length ( index.vector ) > 0 ) {
+        n <- as.numeric ( myArgs [ index.vector [ length ( index.vector ) ] + 1 ] )
+        opt.vector <- c (
+            opt.vector,
+            index.vector,
+            index.vector + 1
+        )
+    }
+    if ( length ( opt.vector ) == 0 ) data.files <- myArgs
+    else data.files <- myArgs [ -opt.vector ]
+    if ( length ( data.files ) > 0 ) {
+        for ( data.file in data.files ) {
+            data.loaded <- load ( data.file )
+            data_PROD <- get ( data.loaded [ 1 ] )
+            print( head( data_PROD, n ) )
+        }
+    }
+}
+

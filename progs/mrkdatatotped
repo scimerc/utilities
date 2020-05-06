@@ -1,0 +1,82 @@
+#!/usr/bin/perl
+# extract genotypes from a genotype probability data file;
+# the output is formatted as a plink transposed ped file (.tped) 
+use strict;
+use warnings;
+use lib '/cluster/projects/p33/groups/biostat/software/lib/perl';
+use opt_manager;
+use toolz;
+
+my $Njunk = 5;
+my $Ngenotypes = 3;
+my $alleleA_coord = 3;
+my $alleleB_coord = 4;
+
+my $composite_options = {
+	'chr' => ''
+};
+
+my $help_messages = {
+	'chr' => "string to place in the first field of the .tped file;\n"
+};
+
+opt_manager::set_composite_options ( $composite_options, $help_messages );
+
+opt_manager::init_help_message ( 
+    " " . toolz::pathless ( $0 ) . " extract genotypes from a snptest input data file\n" . 
+	" and convert it into a plink transposed ped file (.tped).\n"
+);
+
+if ( scalar @ARGV > 0 )
+{
+    my @data = opt_manager::read ( @ARGV );
+    my $chromosome = opt_manager::get ( 'chr' );
+    if ( scalar @data > 0 )
+    {
+        foreach my $datafile ( @data )
+        {
+            my $dh;
+            open ( $dh, '<', "${datafile}" ) or die "\n${datafile}: $!\n";
+            while ( my $line = <$dh> )
+            {
+                chomp $line;
+                my @info = split ( " ", $line, -1 );
+                my @genotypes = ( 
+                    $info[$alleleA_coord] . "\t" . $info[$alleleA_coord],
+                    $info[$alleleA_coord] . "\t" . $info[$alleleB_coord],
+                    $info[$alleleB_coord] . "\t" . $info[$alleleB_coord]
+                );
+                $chromosome = $info[0] if ( $chromosome eq '' );
+                print ( $chromosome . "\t" . $info[1] . "\t0\t" . $info[2] . "\t" );
+                for ( my $index = $Njunk; $index < scalar ( @info ); $index += $Ngenotypes )
+                {
+                    my $genotype = "N\tN";
+                    my $max_probability = 0.;
+                    my $total_probability = 0.;
+                    for ( my $subindex = 0; $subindex < $Ngenotypes; $subindex++ )
+                    {
+                        my $current_probability = $info [ $index + $subindex ];
+                        $total_probability += $current_probability;
+                        if ( $current_probability > $max_probability )
+                        {
+                            $max_probability = $current_probability;
+                            $genotype = $genotypes [ $subindex ];
+                        }
+                    }
+                    print ( $genotype . "\t" );
+                }
+                print "\n";
+            }
+            close $dh;
+        }
+    }
+    else
+    {
+        print "\nno data file specified.\n";
+    }
+}
+else
+{
+	print ( "\n you may have neglected to provide some input (run with '-h' for help).\n\n" );
+}
+

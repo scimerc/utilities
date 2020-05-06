@@ -1,0 +1,12 @@
+#!/usr/bin/env Rscript
+
+myfiles <- commandArgs( TRUE )
+
+for ( i in 1 : length( myfiles ) ) {
+	tempdata <- read.csv( myfiles[ i ], header = F )
+	if ( i == 1 ) data <- tempdata else data <- rbind( data, tempdata )
+	rm( tempdata )
+}
+
+write.table( data, quote = F, row.names =  F, col.names = F )
+

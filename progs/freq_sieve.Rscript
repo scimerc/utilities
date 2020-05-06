@@ -1,0 +1,25 @@
+#!/usr/bin/env Rscript
+basedir = '/cluster/projects/p33/groups/biostat/software'
+source ( paste0( basedir, '/lib/R/nucleocode.R' ) )
+source ( paste0( basedir, '/lib/R/genotype.R' ) )
+mydata.new <- read.table ( "stdin", header = FALSE )
+genA <- genotype ( nucleocode ( mydata.new$V3 ), nucleocode ( mydata.new$V4 ) )
+genB <- genotype ( nucleocode ( mydata.new$V7 ), nucleocode ( mydata.new$V8 ) )
+cgenA <- genotype ( comp.nucleocode ( mydata.new$V3 ), comp.nucleocode ( mydata.new$V4 ) )
+cgenB <- genotype ( comp.nucleocode ( mydata.new$V7 ), comp.nucleocode ( mydata.new$V8 ) )
+mismatches <- mydata.new [ genA != genB & cgenA != genB & genA != cgenB & cgenA != cgenB, 6 ]
+mydata.new.clean <- mydata.new [ ! ( mydata.new$V6 %in% mismatches ), ]
+mydata.new.clean$CEU.MAF <- ifelse (
+	nucleocode ( mydata.new.clean$V3 ) == nucleocode ( mydata.new.clean$V7 ) | 
+	comp.nucleocode ( mydata.new.clean$V3 ) == nucleocode ( mydata.new.clean$V7 ),
+	1. - mydata.new.clean$V5, mydata.new.clean$V5
+)
+outliers <- mydata.new.clean [ abs ( mydata.new.clean$CEU.MAF - mydata.new.clean$V9 ) > 0.1, 6 ]
+mydata.new.cleaner <- mydata.new.clean [ ! ( mydata.new.clean$V6 %in% outliers ), ]
+black.list <- c ( as.character(mismatches), as.character(outliers) )
+log.message <- c ( 
+    paste ( as.character(mismatches), ifelse ( mismatches != "", "dropped because of alleles mismatch", "" ) ),
+    paste ( as.character(outliers), ifelse ( outliers != "", "dropped because of frequencies mismatch", "" ) )
+)
+write.table ( log.message, file = "mismatches.log", col.names=F, row.names=F, quote=F )
+write.table ( black.list, col.names=F, row.names=F, quote=F )

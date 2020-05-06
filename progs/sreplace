@@ -1,0 +1,15 @@
+#!/bin/bash
+
+if [ $# -ne 2 ] ; then
+  echo "usage: sreplace {dictionary-file} {target file}"
+  exit 0
+fi
+
+awk -F $'\t' -v al="$1" 'BEGIN{
+    while (getline < al == 1) alias[$1] = $2;
+} {
+    for ( item in alias )
+        $0 = gensub( "(^|([[:space:]]))"item"(([[:space:]])|$)", "\\2"alias[item]"\\3", "g", $0 )
+    print;
+}' $2
+

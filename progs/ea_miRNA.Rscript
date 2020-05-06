@@ -1,0 +1,684 @@
+#!/usr/bin/env Rscript
+# ea.Rscript - version 0.151 (march 2013)
+# an R program to perform enrichment analysis.
+
+helpme <- FALSE
+
+######################## set working environment up #########################
+# library ( parallel )
+# library ( multicore, quietly = T, warn.conflicts = F )
+# library ( foreach, quietly = T, warn.conflicts = F )
+# library ( doMC, quietly = T, warn.conflicts = F )
+#library ( "EAtests" )  # for distribution
+source ( "/home/checco/lib/R/myEAtests_miRNA.R" )  # for pre-distribution testing
+
+read.header <- FALSE
+annotations <- NULL
+ctrl_annotation = ""
+phenos <- NULL
+
+bootstrap = NULL
+do_compute_fdr = FALSE
+do_draw_fdr_vs_p_plots = FALSE
+do_draw_qq_plots = FALSE
+do_estimate_enrichment = FALSE
+do_genomic_correction = FALSE
+do_perform_bt = FALSE
+do_perform_hgt = FALSE
+expect_rdata = FALSE
+verbose = FALSE
+
+SNP.lists <- c ()
+SNP.filter.lists <- c ()
+
+# p-value percentiles for QQ-plots and tests
+P_prct_plot <- 0.001
+# my_P_prct <- c ( 0.001 )
+# my_P_prct <- c ( 0.001, 0.01, 0.1 )
+my_P_prct <- c ( 0.001, 0.01, 0.1, 0.25, 0.5, 0.9 )
+
+tiny = 1.E-72  # to prevent log(0)
+testp = 1.E-12  # minimum p-value for Hypergeometric test plots
+neglog10max = -log10 ( testp )  # negative logarithm of the minimum p-value
+N_ytics = 5  # number of y-axis tics for Hypergeometric test plots
+
+myFDR <- 0.01  # FDR significance level
+
+my.breaks <- c ()  # vector of interval break points lists
+
+Nq.default <- 4  # default number of annotation quantiles
+Nq.list <- c ()  # number of annotation quantiles
+
+##########################################################################
+
+opt.vector <- vector ()
+
+myArgs <- commandArgs ( TRUE )
+cat ( "\n=============  Enrichment Analysis  =============\n" )
+cat ( "\ncommand line arguments:\n  ", myArgs, "\n" )
+
+if ( length ( myArgs ) > 0 ) {
+
+##############################################################################################
+####################################  parse command line  ####################################
+
+    myArgs.index.vector <- 1 : length ( myArgs )
+
+    help.index.vector <- myArgs.index.vector [ myArgs == "--help" ]
+    if ( length ( help.index.vector ) > 0 ) {
+        helpme <- TRUE
+        opt.vector <- c (
+            help.index.vector
+        )
+    }
+    annot.index.vector <- myArgs.index.vector [ myArgs == "--annot" ]
+    if ( length ( annot.index.vector ) > 0 ) {
+        annotations <- myArgs [ annot.index.vector + 1 ] # array of elements following the flags
+        cat ( c ( "annotations:", annotations, "\n" ), sep = "\n " )
+        opt.vector <- c (
+            opt.vector,
+            annot.index.vector,
+            annot.index.vector + 1
+        )
+    }
+    boot.index.vector <- myArgs.index.vector [ myArgs == "--boot" ]
+    if ( length ( boot.index.vector ) > 0 ) {
+        bootstrap <- myArgs [ boot.index.vector [ length ( boot.index.vector ) ] + 1 ]
+        cat ( c ( "bootstrap requested [bootstrap field =", bootstrap, "]\n" ) )
+        opt.vector <- c (
+            opt.vector,
+            boot.index.vector,
+            boot.index.vector + 1
+        )
+    }
+    bt.index.vector <- myArgs.index.vector [ myArgs == "--bt" ]
+    if ( length ( bt.index.vector ) > 0 ) {
+        do_perform_bt <- TRUE
+        cat ( "binomial test requested.\n" )
+        opt.vector <- c (
+            opt.vector,
+            bt.index.vector
+        )
+    }
+    cfdr.index.vector <- myArgs.index.vector [ myArgs == "--fdr" ]
+    if ( length ( cfdr.index.vector ) > 0 ) {
+        do_compute_fdr <- TRUE
+        cat ( "fdr requested.\n" )
+        opt.vector <- c (
+            opt.vector,
+            cfdr.index.vector
+        )
+    }
+    ee.index.vector <- myArgs.index.vector [ myArgs == "--eest" ]
+    if ( length ( ee.index.vector ) > 0 ) {
+        do_estimate_enrichment <- TRUE
+        cat ( "enrichment estimate requested.\n" )
+        opt.vector <- c (
+            opt.vector,
+            ee.index.vector
+        )
+    }
+    fdr.index.vector <- myArgs.index.vector [ myArgs == "--fdrv" ]
+    if ( length ( fdr.index.vector ) > 0 ) {
+        myFDR <- as.numeric ( myArgs [ fdr.index.vector [ length ( fdr.index.vector ) ] + 1 ] )
+        cat ( c ( "FDR set to:", myFDR, "\n" ) )
+        opt.vector <- c (
+            opt.vector,
+            fdr.index.vector,
+            fdr.index.vector + 1
+        )
+    }
+    fdrvsp.index.vector <- myArgs.index.vector [ myArgs == "--fdrvsp" ]
+    if ( length ( fdrvsp.index.vector ) > 0 ) {
+        do_compute_fdr <- TRUE
+        do_draw_fdr_vs_p_plots <- TRUE
+        cat ( "FDR_VS_p plots requested.\n" )
+        opt.vector <- c (
+            opt.vector,
+            fdrvsp.index.vector
+        )
+    }
+    gc.index.vector <- myArgs.index.vector [ myArgs == "--gc" ]
+    if ( length ( gc.index.vector ) > 0 ) {
+        do_genomic_correction <- TRUE
+        cat ( "genomic correction requested.\n" )
+        opt.vector <- c (
+            opt.vector,
+            gc.index.vector
+        )
+    }
+    header.index.vector <- myArgs.index.vector [ myArgs == "--header" ]
+    if ( length ( header.index.vector ) > 0 ) {
+        read.header <- TRUE
+        cat ( "expecting header in input files..\n" )
+        opt.vector <- c (
+            opt.vector,
+            header.index.vector
+        )
+    }
+    hgt.index.vector <- myArgs.index.vector [ myArgs == "--hgt" ]
+    if ( length ( hgt.index.vector ) > 0 ) {
+        do_perform_hgt <- TRUE
+        cat ( "hypergeometric test requested.\n" )
+        opt.vector <- c (
+            opt.vector,
+            hgt.index.vector
+        )
+    }
+    ictrl.index.vector <- myArgs.index.vector [ myArgs == "--ictrl" ]
+    if ( length ( ictrl.index.vector ) > 0 ) {
+        ctrl_annotation <- "Intergenic"
+        cat ( "using intergenic control SNPs.\n" )
+        opt.vector <- c (
+            opt.vector,
+            ictrl.index.vector
+        )
+    }
+    pheno.index.vector <- myArgs.index.vector [ myArgs == "--pheno" ]
+    if ( length ( pheno.index.vector ) > 0 ) {
+        phenos <- myArgs [ pheno.index.vector + 1 ] # array of elements following the flags
+        cat ( c ( "phenotypes:", phenos, "\n" ), sep = "\n " )
+        opt.vector <- c (
+            opt.vector,
+            pheno.index.vector,
+            pheno.index.vector + 1
+        )
+    }
+    testp.index.vector <- myArgs.index.vector [ myArgs == "--testp" ]
+    if ( length ( testp.index.vector ) > 0 ) {
+        testp <- as.numeric ( myArgs [ testp.index.vector [ length ( testp.index.vector ) ] + 1 ] )
+        cat ( c ( "HGT p-value plot ceiling set to:", testp, "\n" ) )
+        if ( tiny > testp ) tiny <- testp
+        neglog10max <- -log10 ( testp )
+        while ( ( neglog10max / ( N_ytics - 1 ) ) %% 2 != 0 ) N_ytics = N_ytics + 1
+        opt.vector <- c (
+            opt.vector,
+            testp.index.vector,
+            testp.index.vector + 1
+        )
+    }
+    thresh.index.vector <- myArgs.index.vector [ myArgs == "--prct" ]
+    if ( length ( thresh.index.vector ) > 0 ) {
+        my_P_prct <- as.numeric ( myArgs [ thresh.index.vector + 1 ] ) # array of elements following the flags
+        cat ( c ( "p-value percentiles:", my_P_prct, "\n" ) )
+        opt.vector <- c (
+            opt.vector,
+            thresh.index.vector,
+            thresh.index.vector + 1
+        )
+    }
+    qq.index.vector <- myArgs.index.vector [ myArgs == "--qq" ]
+    if ( length ( qq.index.vector ) > 0 ) {
+        do_draw_qq_plots <- TRUE
+        cat ( "qq-plots requested.\n" )
+        opt.vector <- c (
+            opt.vector,
+            qq.index.vector
+        )
+    }
+    r.index.vector <- myArgs.index.vector [ myArgs == "--r" ]
+    if ( length ( r.index.vector ) > 0 ) {
+        expect_rdata <- TRUE
+        cat ( "expecting R data as input..\n" )
+        opt.vector <- c (
+            opt.vector,
+            r.index.vector
+        )
+    }
+    snp.index.vector <- myArgs.index.vector [ myArgs == "--snp" ]
+    if ( length ( snp.index.vector ) > 0 ) {
+        SNP.lists <- myArgs [ snp.index.vector + 1 ] # array of elements following the flags
+        cat ( c ( "SNP lists:", SNP.lists, "\n" ), sep = "\n " )
+        opt.vector <- c (
+            opt.vector,
+            snp.index.vector,
+            snp.index.vector + 1
+        )
+    }
+    break.index.vector <- myArgs.index.vector [ myArgs == "--strbr" ]
+    if ( length ( break.index.vector ) > 0 ) {
+        my.breaks <- myArgs [ break.index.vector + 1 ] # array of elements following the flags
+        cat ( c ( "annotation strata breaking points:", my.breaks, "\n" ), sep = "\n " )
+        opt.vector <- c (
+            opt.vector,
+            break.index.vector,
+            break.index.vector + 1
+        )
+    }
+    nq.index.vector <- myArgs.index.vector [ myArgs == "--strn" ]
+    if ( length ( nq.index.vector ) > 0 ) {
+        Nq.list <- myArgs [ nq.index.vector + 1 ] # array of elements following the flags
+        cat ( c ( "annotation strata quantiles:", Nq.list, "\n" ), sep = "\n " )
+        opt.vector <- c (
+            opt.vector,
+            nq.index.vector,
+            nq.index.vector + 1
+        )
+    }
+    v.index.vector <- myArgs.index.vector [ myArgs == "--v" ]
+    if ( length ( v.index.vector ) > 0 ) {
+        verbose <- TRUE
+        cat ( "verbose mode on.\n" )
+        opt.vector <- c (
+            opt.vector,
+            v.index.vector
+        )
+    }
+    if ( length ( opt.vector ) == 0 ) data.files <- myArgs
+    else data.files <- myArgs [ -opt.vector ]
+    
+##############################################################################################
+##############################################################################################
+
+    if ( length ( data.files ) > 0 && !helpme ) {
+
+        for ( data.file in data.files ) {
+
+            ############################################ read data table ##############################################
+            cat ( "reading data..\n" )
+            if ( expect_rdata ) {
+                data.loaded <- load ( data.file )
+                data_PROD <- get ( data.loaded [ 1 ] )
+            } else if ( read.header ) {
+                data_PROD <- read.table ( data.file, header = T )
+            } else { data_PROD <- read.table ( data.file, header = F ) }
+            names ( data_PROD ) [ 1 ] <- "MarkerName"
+            if ( verbose ) print ( head ( data_PROD ) )
+            if ( is.null ( phenos ) ) phenos <- 2
+            phenos <- names ( subset ( head ( data_PROD ), select = phenos ) )
+            cat ( "phenotypes: ", phenos, "\n" )
+            if ( is.null ( annotations ) ) {
+				annotations <- names ( data_PROD ) [ - which ( names ( data_PROD ) %in% c ( "MarkerName", phenos ) ) ]
+			} else annotations <- names ( subset ( head ( data_PROD ), select = annotations ) )
+            cat ( "annotations: ", annotations, "\n" )
+            ###########################################################################################################
+
+            if ( do_genomic_correction ) {
+				cat ( "performing genomic correction..\n" )
+				for ( pheno in phenos ) data_PROD [, pheno ] <- gc.pval ( data_PROD [, pheno ] )
+			}
+
+            if ( length ( SNP.lists ) > 0 ) {
+                SNP.list.counter = 1
+				cat ( "reading SNP lists..\n" )
+                for ( SNP.list in SNP.lists ) {
+                    read.table ( SNP.list, header = F ) -> tmp.list
+                    filter.name <- paste ( "filter", SNP.list.counter )
+                    while ( filter.name %in% names ( data_PROD ) ) filter.name <- paste ( filter.name, SNP.list.counter )
+                    data_PROD <- data_PROD [ data_PROD$MarkerName %in% tmp.list$V1, ]
+                    SNP.filter.lists <- c ( SNP.filter.lists, filter.name )
+                    SNP.list.counter = SNP.list.counter + 1
+                }
+            }
+
+            for ( annotation in annotations ) {
+
+                aj <- which ( annotations == annotation )
+                cat ( "working on annotation [", aj, "] '", annotation, "'..\n", sep = "" )
+
+                annotation_quant <- paste ( annotation, "quant", sep = "_" )
+
+                if ( aj <= length ( my.breaks ) && my.breaks [ aj ] != "auto" ) {
+
+                    Nq <- Nq.default
+                    if ( aj < length ( Nq.list ) ) Nq <- Nq.list [ aj ]
+
+                    if ( my.breaks [ aj ] == "std" ) {
+                        my.qdata <- data_PROD [, annotation ]
+                        my.current.breaks <- quantile ( my.qdata, probs = seq ( 0, 1, by = 1 / Nq ), na.rm=T )
+                    } else if ( my.breaks [ aj ] == "unq" ) {
+                        my.qdata <- unique ( data_PROD [, annotation ] )
+                        my.current.breaks <- quantile ( my.qdata, probs = seq ( 0, 1, by = 1 / Nq ), na.rm=T )
+                    } else my.current.breaks <- sort ( c (
+						as.numeric ( unlist ( strsplit ( my.breaks [ aj ], "," ) ) ),
+                        min ( data_PROD [, annotation ], na.rm = T ), max ( data_PROD [, annotation ], na.rm=T )
+                    ) )
+
+                    if ( length ( my.current.breaks ) > length ( unique ( my.current.breaks ) ) ) {
+                        cat ( "warning: non-unique breaking points for annotation '", annotation, "' collapsed.\n", sep = "" )
+                        my.current.breaks = sort ( unique ( my.current.breaks ) )
+                    }
+                    cat ( "computed annotation strata breaking points:", my.current.breaks, "\n" )
+                    data_PROD [, annotation_quant ] <- cut ( data_PROD [, annotation ], my.current.breaks, include.lowest=T )
+                
+                } else {
+                    
+                    data_PROD [, annotation_quant ] <- data_PROD [, annotation ]
+
+                }
+
+                for ( pheno in phenos ) {
+                
+					cat ( "working on phenotype ", pheno, "..\n", sep = "" )
+
+                    if ( do_compute_fdr ) {
+
+                        cat ( "computing FDR..\n" )
+                        fdr.filename <- paste ( data.file, "_FDR_", myFDR, "_", pheno, "_", annotation, ".txt", sep = "" )
+                        if ( verbose ) {
+							cat ( "call of compute_fdr() with arguments:\n" )
+							cat ( "data.file = " ); print ( data.file )
+							cat ( "data_PROD =\n" ); print ( head ( data_PROD ) )
+							cat ( "pheno = " ); print ( pheno )
+							cat ( "annotation = " ); print ( annotation )
+							cat ( "myFDR = " ); print ( myFDR )
+						}
+                        my.fdr.table <- compute_fdr ( data.file, data_PROD, pheno, annotation, myFDR, do_draw_fdr_vs_p_plots )
+                        my.names <- colnames ( my.fdr.table )
+                        my.names [ 1 ] <- paste ( paste ( annotation, "strata", sep = "_" ), "[=]" )
+                        write.table ( my.fdr.table, file = fdr.filename, quote = F, col.names = my.names, na = "-" )
+
+                    }
+
+                    if ( do_draw_qq_plots ) {
+
+                        cat ( "drawing QQ-plots..\n" )
+                        png ( filename = paste ( data.file, "_", pheno, "_", annotation, '_QQ_allP.png', sep = "" ) )
+                        qq.table.filename <- paste ( data.file, "_", pheno, "_", annotation, "_QQ_table.txt", sep = "" )
+                        if ( verbose ) {
+							cat ( "call of draw_qq_plots() with arguments:\n" )
+							cat ( "data_PROD =\n" ); print ( head ( data_PROD ) )
+							cat ( "pheno = " ); print ( pheno )
+							cat ( "annotation = " ); print ( annotation )
+							cat ( "P_prct_plot = " ); print ( P_prct_plot )
+						}
+                        qq.table <- draw_qq_plots ( data_PROD, pheno, annotation, P_prct_plot, verbose )
+                        write.table ( qq.table, file = qq.table.filename, quote = F, row.names = F )
+                        dev.off()
+
+                    }
+                    
+                    if ( do_estimate_enrichment ) {
+                    
+                        cat ( "estimating enrichment..\n" )
+                        enrichment.filename <- paste ( data.file, "_EE_", pheno, "_", annotation, ".txt", sep = "" )
+                        if ( verbose ) {
+							cat ( "call of estimate_enrichment() with arguments:\n" )
+							cat ( "data_PROD =\n" ); print ( head ( data_PROD ) )
+							cat ( "pheno = " ); print ( pheno )
+							cat ( "annotation = " ); print ( annotation )
+						}
+                        my.enrichment.table <- estimate_enrichment ( data_PROD, pheno, annotations, annotation )
+                        my.names <- colnames ( my.enrichment.table )
+                        my.names [ 1 ] <- paste ( paste ( annotation, "strata", sep = "_" ), "[=]" )
+                        write.table ( my.enrichment.table, file = enrichment.filename, quote = F, col.names = my.names, na = "-" )
+                    
+                    }
+                      
+                    if ( do_perform_bt ) {
+                    
+                        png ( paste ( data.file, "_BT_", pheno , "_", annotation, ".png", sep = "" ) )
+                        par ( mar = c ( 5, 5, 5, 2 ) )
+                        # set plot area up
+                        plot ( NULL,
+                            cex = 1.5,
+                            xaxt = "n", yaxt = "n",
+                            xlab = "", ylab = "",
+                            xlim = c ( log10 ( min ( my_P_prct ) ), log10 ( max ( my_P_prct ) ) ),
+                            ylim = c ( 0, neglog10max )
+                        )
+
+                        counter = 1
+
+                        for ( P_prct in my_P_prct ) {
+                            cat ( "performing binomial test for Top ", P_prct*100, "%..\n", sep = "" )
+                            bt.filename <- paste ( data.file, "_BT_", format ( P_prct, scientific = 4 ), "_", pheno, "_", annotation, ".txt", sep = "" )
+                            bt.datafilename <- paste ( data.file, "_BT_", format ( P_prct, scientific = 4 ), "_", pheno, "_", annotation, ".RData", sep = "" )
+                            my.bt.table <- perform_bt ( data_PROD, pheno, annotation, ctrl_annotation, P_prct )
+                            if ( !is.null ( bootstrap ) ) {
+                                cat ( "proceeding with bootstrap..\n" )
+                                bootstrap.function <- function ( data_BOOT, indices, P_pheno, annot_name, annot_name_ctrl, P_prct ) {
+                                    perform_bt ( data_BOOT, P_pheno, annot_name, annot_name_ctrl, P_prct, indices )
+                                }
+                                bootstrap.test <- boot (
+                                    data_PROD [ !is.na ( data_PROD [, bootstrap ] ), ], bootstrap.function, 10000,
+                                    weights = data_PROD [ !is.na ( data_PROD [, bootstrap ] ), bootstrap ],
+                                    P_pheno = pheno,
+                                    annot_name = annotation,
+                                    annot_name_ctrl = ctrl_annotation,
+#                                     parallel = "multicore",
+#                                     ncpus = 2,
+                                    P_prct = P_prct
+                                )
+                                if ( verbose ) print ( bootstrap.test )
+                                for ( i in 1 : length ( bootstrap.test$t0 ) ) {
+                                    my.bt.table [ i ] <- NA
+                                    if ( !all ( is.na ( bootstrap.test$t [, i ] ) ) ) {
+                                        tecdf <- ecdf ( c ( bootstrap.test$t0 [ i ], bootstrap.test$t [, i ] ) )
+                                        if ( verbose ) cat ( "test outcome [", i, "]: ", bootstrap.test$t0 [ i ], "\n", sep="" )
+                                        my.bt.table [ i ] <- tecdf ( bootstrap.test$t0 [ i ] )
+                                        if ( verbose ) {
+                                            bt.pngname <- paste ( data.file, "_BT_", i, "_", format ( P_prct, scientific = 4 ), "_", pheno, "_", annotation, ".png", sep = "" )
+                                            png ( bt.pngname, 800, 400 )
+                                            par ( mfrow = c ( 1, 2 ) )
+                                            plot ( tecdf )
+                                            abline ( v = bootstrap.test$t0 [ i ], lwd=2, col="red" )
+                                            hist ( bootstrap.test$t [, i ], breaks="scott" )
+                                            abline ( v = bootstrap.test$t0 [ i ], lwd=2, col="red" )
+                                            dev.off ()
+                                        }
+                                    }
+                                }
+                                if ( verbose ) {
+                                    print ( my.bt.table )
+                                    save ( bootstrap.test, file=bt.datafilename )
+                                }
+                            }
+                            if ( counter == 1 ) { # set stuff up
+                                my.colnames <- colnames ( my.bt.table )
+                                my.rownames <- rownames ( my.bt.table )
+                                key.names <- paste ( rep ( my.colnames, each = length ( my.rownames ) ), my.rownames ) # lines in the plot
+                                key.points <- rep ( c ( 16, seq ( 6, 6 - 4 * ( length ( my.colnames ) - 1 ) + 1, by = -4 ) ) %% 25, each = length ( my.rownames ) )
+                                key.colors <- rep ( rgb ( my.color.function ( ( 1 : length ( my.rownames ) ) / length ( my.rownames ) ) / 255 ), length ( my.colnames ) )
+                                my.colnames [ 1 ] <- paste ( paste ( annotation, "strata", sep = "_" ), "[=]" )
+                                my.x.data <- matrix ( ncol = length ( my_P_prct ), nrow = length ( my.bt.table ) )
+                                my.y.data <- matrix ( ncol = length ( my_P_prct ), nrow = length ( my.bt.table ) )
+                            }
+                            write.table ( format ( my.bt.table, digits = 2, scientific = T, quote = F ), file = bt.filename, quote = F, col.names = my.colnames, na = "-" )
+                            my.x.data [, which ( my_P_prct == P_prct ) ] <- rep ( log10 ( P_prct ), length ( my.bt.table ) )
+                            my.y.data [, which ( my_P_prct == P_prct ) ] <- -log10 ( c ( my.bt.table ) + tiny )
+                            counter = counter + 1
+                        }
+
+                        exclusion_list <- c ( # these won't be taken into account
+#                         TODO: these are hard-coded, find a way to soft-code them
+                            paste ( "[>]", " quantile_", length ( my.rownames ), sep = "" ),
+                            paste ( "[>]", " quantile_", length ( my.rownames ) - 1, sep = "" ),
+                            paste ( "[<]", " quantile_", 1, sep = "" ),
+                            paste ( "[<]", " quantile_", 2, sep = "" )
+                        )
+
+                        for ( k in 1 : length ( key.names ) ) {
+                            if ( ! key.names [ k ] %in% exclusion_list ) {
+                                lines (
+                                    x = my.x.data [ k, !is.na ( my.y.data [ k, ] ) ],
+                                    y = my.y.data [ k, !is.na ( my.y.data [ k, ] ) ],
+                                    col = key.colors [ k ],
+                                    pch = key.points [ k ],
+                                    type = "b",
+                                    cex = 1.5 
+                                )
+                            }
+                        }
+                        
+                        # multiple tests significance lines
+                        abline ( a = 2, b = 0, col = 'red', lwd = 1.5, lty = 2 )
+                        abline ( a = -log10 ( 0.05 ), b = 0, col = 'orange', lwd = 1.5, lty = 2 )
+
+                        title (
+                            main = paste ( pheno, annotation ),
+                            xlab = "association P-value log10(percentile)",
+                            ylab = "Test -log10(p-value)"
+                        )
+                        axis ( 1,
+                            at = log10 ( c ( my_P_prct [ my_P_prct <= 0.1 ], 0.9 ) ),
+                            labels = paste ( "Top ", c ( my_P_prct [ my_P_prct <= 0.1 ], 0.9 ) * 100, "%", sep = "" )
+                        )
+                        axis ( 2, at = seq ( 0, neglog10max, length.out = N_ytics ) )
+
+                        my.keys <- ! key.names %in% exclusion_list
+
+                        legend (
+                            "topleft",
+                #             inset = c ( -0.25, 0 ),
+                            key.names [ my.keys ],
+                            pch = key.points [ my.keys ],
+                            col = key.colors [ my.keys ],
+                            pt.cex = 1.5,
+                            xpd = T
+                        )
+
+                        dev.off ()
+
+                    }
+                    
+					if ( do_perform_hgt ) {
+                    
+                        cat ( "performing hypergeometric test..\n" )
+                        png ( paste ( data.file, "_HGT_", pheno , "_", annotation, ".png", sep = "" ) )
+                        par ( mar = c ( 5, 5, 5, 2 ) )
+                        # set plot area up
+                        plot ( NULL,
+                            cex = 1.5,
+                            xaxt = "n", yaxt = "n",
+                            xlab = "", ylab = "",
+                            xlim = c ( log10 ( min ( my_P_prct ) ), log10 ( max ( my_P_prct ) ) ),
+                            ylim = c ( 0, neglog10max )
+                        )
+
+                        counter = 1
+
+                        for ( P_prct in my_P_prct ) {
+                            hgt.filename <- paste ( data.file, "_HGT_", format ( P_prct, scientific = 4 ), "_", pheno, "_", annotation, ".txt", sep = "" )
+                            my.hgt.table <- perform_hgt ( data_PROD, pheno, annotation, P_prct )
+                            if ( counter == 1 ) { # set stuff up
+                                my.colnames <- colnames ( my.hgt.table )
+                                my.rownames <- rownames ( my.hgt.table )
+                                key.names <- paste ( rep ( my.colnames, each = length ( my.rownames ) ), my.rownames ) # lines in the plot
+                                key.points <- rep ( c ( 16, seq ( 6, 6 - 4 * ( length ( my.colnames ) - 1 ) + 1, by = -4 ) ) %% 25, each = length ( my.rownames ) )
+                                key.colors <- rep ( rgb ( my.color.function ( ( 1 : length ( my.rownames ) ) / length ( my.rownames ) ) / 255 ), length ( my.colnames ) )
+                                my.colnames [ 1 ] <- paste ( paste ( annotation, "strata", sep = "_" ), "[=]" )
+                                my.x.data <- matrix ( ncol = length ( my_P_prct ), nrow = length ( my.hgt.table ) )
+                                my.y.data <- matrix ( ncol = length ( my_P_prct ), nrow = length ( my.hgt.table ) )
+                            }
+                            write.table ( format ( my.hgt.table, digits = 2, scientific = T, quote = F ), file = hgt.filename, quote = F, col.names = my.colnames, na = "-" )
+                            my.x.data [, which ( my_P_prct == P_prct ) ] <- rep ( log10 ( P_prct ), length ( my.hgt.table ) )
+                            my.y.data [, which ( my_P_prct == P_prct ) ] <- -log10 ( c ( my.hgt.table ) + tiny )
+                            counter = counter + 1
+                        }
+
+                        exclusion_list <- c ( # these won't be taken into account
+#                         TODO: these are hard-coded, find a way to soft-code them
+                            paste ( "[>]", " quantile_", length ( my.rownames ), sep = "" ),
+                            paste ( "[>]", " quantile_", length ( my.rownames ) - 1, sep = "" ),
+                            paste ( "[<]", " quantile_", 1, sep = "" ),
+                            paste ( "[<]", " quantile_", 2, sep = "" )
+                        )
+
+                        for ( k in 1 : length ( key.names ) ) {
+                            if ( ! key.names [ k ] %in% exclusion_list ) {
+                                lines (
+                                    x = my.x.data [ k, !is.na ( my.y.data [ k, ] ) ],
+                                    y = my.y.data [ k, !is.na ( my.y.data [ k, ] ) ],
+                                    col = key.colors [ k ],
+                                    pch = key.points [ k ],
+                                    type = "b",
+                                    cex = 1.5 
+                                )
+                            }
+                        }
+                        
+                        # multiple tests significance line
+                        abline ( a = 2, b = 0, col = 'red', lwd = 1.5, lty = 2 )
+                        abline ( a = -log10 ( 0.05 ), b = 0, col = 'orange', lwd = 1.5, lty = 2 )
+
+                        title (
+                            main = paste ( pheno, annotation ),
+                            xlab = "association P-value log10(percentile)",
+                            ylab = "Hypergeometric Test -log10(p-value)"
+                        )
+                        axis ( 1,
+                            at = log10 ( c ( my_P_prct [ my_P_prct <= 0.1 ], 0.9 ) ),
+                            labels = paste ( "Top ", c ( my_P_prct [ my_P_prct <= 0.1 ], 0.9 ) * 100, "%", sep = "" )
+                        )
+                        axis ( 2, at = seq ( 0, neglog10max, length.out = N_ytics ) )
+
+                        my.keys <- ! key.names %in% exclusion_list
+
+                        legend (
+                            "topleft",
+                #             inset = c ( -0.25, 0 ),
+                            key.names [ my.keys ],
+                            pch = key.points [ my.keys ],
+                            col = key.colors [ my.keys ],
+                            pt.cex = 1.5,
+                            xpd = T
+                        )
+
+                        dev.off ()
+
+                    }
+
+                }
+
+            }
+
+        }
+
+        if ( verbose ) {
+            dataname <- paste ( data.file, "_EA.RData", sep = "" )
+            save.image( file = dataname )
+        }
+
+    } else if ( !helpme ) {
+
+        cat ( "\nyou may have neglected to provide input.\n" )
+        helpme <- TRUE
+
+    }
+
+} else {
+
+    cat ( "\nyou may have neglected to provide input.\n" )
+    helpme <- TRUE
+
+}
+
+if ( helpme ) {    
+    cat ( "\n usage:\n" )
+    cat ( "\n  ea.Rscript [options] <data table(s)>\n" )
+    cat ( "\n  the first field in <data table> is the marker; the other fields should be p-values and annotations;\n" )
+    cat ( "  by default the script expects <data table(s)> with the format: <MarkerName>  <p-value>  <annotation>;\n" )
+    cat ( "  p-values and annotations fields can be specified with '--pheno' and '--annot' respectively (see below).\n" )
+    cat ( "  the script writes a number of files, all prefixed with <data table>'s name.\n" )
+    cat ( "\n options:\n" )
+    cat ( "    --help           print help and exit;\n" )
+    cat ( "    --annot <annot>  annotation field (can be numeric or word);\n" )
+    cat ( "    --boot <field>   bootstrap weights field [ no bootstrap by default ];\n" )
+    cat ( "    --bt             perform binomial tests [ no tests by default ];\n" )
+    cat ( "    --fdr            compute fdr [ no fdr by default ];\n" )
+    cat ( "    --fdrv <value>   threshold for false discovery [ default =", myFDR, "];\n", sep = " " )
+    cat ( "    --fdrvsp         draw fdr_vs_p plots (forces '--fdr') [ no plots by default ];\n" )
+    cat ( "    --eest           estimate enrichment [ no estimate by default ];\n" )
+    cat ( "    --gc             perform genomic correction of p-values [ no gc by default ];\n" )
+    cat ( "    --header         if text data files have a header line [ no header expected by default ];\n" )
+    cat ( "    --hgt            perform hypergeometric tests [ no tests by default ];\n" )
+    cat ( "    --ictrl          use intergenic SNPs (\"Intergenic\" label) as control [ default is everything ];\n" )
+    cat ( "    --pheno <pheno>  phenotype field (can be numeric or word);\n" )
+    cat ( "    --prct <value>   p-value percentiles in which to test for significance [ default =", my_P_prct, "];\n", sep = " " )
+    cat ( "                     only one threshold can be specified per command line option;\n" )
+    cat ( "    --qq             draw qq-plots [ no plots by default ];\n" )
+    cat ( "    --r              expect input files in R data format;\n" )
+    cat ( "    --snp <file>     list of SNPs to restrict the analyses to: if more lists are given, each is a filter;\n" )
+    cat ( "    --strbr <value>  breaking criteria for annotations:\n" )
+    cat ( "                     values can be either words 'auto', 'std', 'unq' or comma-separated lists of break points;\n" )
+    cat ( "                       'auto'  means 'use the annotation value itself as quantile' (good for discrete annotations)\n" )
+    cat ( "                       'std'   means 'make (n) quantiles (see '--strn') using _all_ annotation values',\n" )
+    cat ( "                       'unq'   means make (n) quantiles removing duplicate annotation values';\n" )
+    cat ( "                     values are assigned, in order, to annotations (missing values are treated as 'auto');\n" )
+    cat ( "    --strn <value>   n. of annotation quantiles: values are assigned, in order, to annotations [ default =", Nq.default, "];\n", sep = " " )
+    cat ( "                     [note: these options are overridden by '--strbr' options with numerical break points]\n" )
+    cat ( "    --testp <value>  significance tests p-value plots ceiling [ default =", testp, "];\n", sep = " " )
+    cat ( "    --v              verbose mode on (the program prints lots of stuff on screen);\n" )
+    cat ( "\n" )
+}

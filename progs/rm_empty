@@ -1,0 +1,6 @@
+#!/bin/tcsh
+foreach mfile ( $* )
+	if ( -z ${mfile} ) then
+		rm ${mfile}
+	endif
+end

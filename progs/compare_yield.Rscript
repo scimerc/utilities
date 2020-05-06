@@ -1,0 +1,88 @@
+#!/usr/bin/env Rscript
+helpme <- 0
+filter.file <- ""
+pthresh <- 0.1
+opt.vector <- vector ()
+args <- commandArgs ( TRUE )
+if ( length ( args ) > 1 ) {
+	args <- commandArgs ( TRUE )
+	args.index.vector <- 1 : length ( args )
+	help.index.vector <- args.index.vector [ args == "--help" ]
+	if ( length ( help.index.vector ) > 0 ) {
+		helpme <- 1
+		opt.vector <- c (
+			help.index.vector
+		)
+	}
+	thresh.index.vector <- args.index.vector [ args == "--thresh" ]
+	if ( length ( thresh.index.vector ) > 0 ) {
+		pthresh <- as.numeric ( args [ thresh.index.vector [ length ( thresh.index.vector ) ] + 1 ] )
+		cat ( c ( "threshold set to:", pthresh, "\n" ) )
+		opt.vector <- c (
+			opt.vector,
+			thresh.index.vector,
+			thresh.index.vector + 1
+		)
+	}
+	filter.index.vector <- args.index.vector [ args == "--use" ]
+	if ( length ( filter.index.vector ) > 0 ) {
+		filter.file <- args [ filter.index.vector [ length ( filter.index.vector ) ] + 1 ]
+		used.snps <- read.table ( filter.file )
+		opt.vector <- c (
+			opt.vector,
+			filter.index.vector,
+			filter.index.vector + 1
+		)
+	}
+	if ( length ( opt.vector ) == 0 ) yield.files <- args
+	else yield.files <- args [ -opt.vector ]
+	if ( length ( yield.files ) > 1 && helpme != 1 ) {
+		yield.A <- read.table ( yield.files [1] )
+		yield.B <- read.table ( yield.files [2] )
+		yield.AB <- merge ( yield.A, yield.B, by = 1 )
+		if ( filter.file == "" ) used.snps <- data.frame ( yield.AB$V1 )
+		for ( snp.name in yield.AB$V1 ) {
+			snp.coord <- yield.AB$V1 == snp.name
+			if ( yield.AB$V3.x [ snp.coord ] != yield.AB$V2.x [ snp.coord ] || yield.AB$V3.y [ snp.coord ] != yield.AB$V2.y [ snp.coord ] ) {
+				tmp <- fisher.test (
+					matrix (
+						c (
+							yield.AB$V3.x [ snp.coord ],
+							yield.AB$V3.y [ snp.coord ],
+							yield.AB$V2.x [ snp.coord ] - yield.AB$V3.x [ snp.coord ],
+							yield.AB$V2.y [ snp.coord ] - yield.AB$V3.y [ snp.coord ]
+						), 2
+					)
+				)
+				yield.AB$p.value [ snp.coord ] <- tmp$p.value
+			} else {
+				yield.AB$p.value [ snp.coord ] <- 1
+			}
+		}
+		remove ( tmp )
+		asymmetric.yield.AB <- yield.AB [ yield.AB$p.value < pthresh & yield.AB$V1 %in% used.snps$yield.AB.V1, ]
+		if ( length ( asymmetric.yield.AB$V1 ) > 0 ) {
+			write.table ( 
+				asymmetric.yield.AB [ order ( asymmetric.yield.AB$p.value ), ], 
+				col.names = F, row.names = F, quote = F
+			)
+		}
+	} else {
+		cat ( "\nyou may have neglected to provide input.\n" )
+	 	helpme <- 1
+	}
+} else {
+	cat ( "\nyou may have neglected to provide input.\n" )
+	helpme <- 1
+}
+if ( helpme ) {	
+	cat ( "\n usage:\n" )
+	cat ( "\n  compare_yield.Rscript [options] <marker yield file A> <marker yield file B>\n" )
+	cat ( "\n options:\n" )
+	cat ( "    --help        print help and exit;\n" )
+	cat ( "    --thresh      set p-value threshold;\n" )
+	cat ( "    --use         list of markers to restrict output to.\n" )
+	cat ( "\n" )
+}
+q()
+

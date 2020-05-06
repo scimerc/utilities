@@ -1,0 +1,158 @@
+#!/usr/bin/env Rscript
+source( "/cluster/projects/p33/groups/biostat/software/lib/R/myprune.R" )
+source( "/cluster/projects/p33/groups/biostat/software/lib/R/dosecorr.R" )
+# print help message
+# - parameters: list of (default) parameters
+print_help_message <- function ( parameters ) {
+
+    cat( "\nextract a list of semi-independent variants from a dosage file, given a correlation matrix." )
+    cat( "\nthe program will write a list of variant names to standard output.\n" )
+    cat( "\n USAGE:\n" )
+    cat( "\n  myprune.Rscript [options] -c <corr file> <dosage file(s)>\n" )
+    cat( "\n OPTIONS:\n\n" )
+    cat( "    -help           print help and exit;\n" )
+    cat( "    -h              expect header in file;\n" )
+    cat( "    -m <mode>       pruning mode; can be 'max', 'center' or a file [default '", parameters$mode, "'];\n", sep="" )
+    cat( "                    the file should have a header and contain a field called 'SNP' with SNP names\n" )
+    cat( "                    and one called 'P' according to which the SNPs will be (increasingly) sorted.\n" )
+    cat( "                    if there are files called 'max' or 'center' where you are running the script\n" )
+    cat( "                    things will be a bit messed up.\n" )
+    cat( "    -rsq <value>    r-square [default '", parameters$rsq, "'];\n", sep="" )
+    cat( "    -r              human readable file expected [default=gzip];\n" )
+    cat( "    -v              verbose mode on (the program prints lots of stuff on screen);\n" )
+    cat( "\n" )
+}
+
+# parse command line arguments
+# - myArgs: the command line arguments
+# returns a list of parameters
+parse_command_line <- function ( myArgs=NULL ) {
+
+	parameters <- list(
+
+		helpme = FALSE,
+		corrfile = "",
+		gzfile = TRUE,
+		header = FALSE,
+		mode = "max",
+		rsq = 0.25,
+		verbose = FALSE
+
+	)
+
+	if ( length( myArgs ) > 0 ) {
+
+		opt.vector <- vector()
+		index.vector <- 1 : length( myArgs )
+
+		sub.index.vector <- index.vector[ myArgs == "-help" ]
+		if ( length( sub.index.vector ) > 0 ) {
+			parameters$helpme <- TRUE
+			opt.vector <- c(
+				sub.index.vector
+			)
+		}
+		sub.index.vector <- index.vector[ myArgs == "-c" ]
+		if ( length( sub.index.vector ) > 0 ) {
+			parameters$corrfile <- myArgs[ sub.index.vector[ length( sub.index.vector ) ] + 1 ]
+			opt.vector <- c(
+				opt.vector,
+				sub.index.vector,
+				sub.index.vector + 1
+			)
+		}
+        sub.index.vector <- index.vector[ myArgs == "-h" ]
+        if ( length( sub.index.vector ) > 0 ) {
+            parameters$header <- TRUE
+            opt.vector <- c(
+                opt.vector,
+                sub.index.vector
+            )
+        }
+		sub.index.vector <- index.vector[ myArgs == "-m" ]
+		if ( length( sub.index.vector ) > 0 ) {
+			parameters$mode <- myArgs[ sub.index.vector[ length( sub.index.vector ) ] + 1 ]
+			opt.vector <- c(
+				opt.vector,
+				sub.index.vector,
+				sub.index.vector + 1
+			)
+		}
+		sub.index.vector <- index.vector[ myArgs == "-rsq" ]
+		if ( length( sub.index.vector ) > 0 ) {
+			parameters$rsq <- as.numeric( myArgs[ sub.index.vector[ length( sub.index.vector ) ] + 1 ] )
+			opt.vector <- c(
+				opt.vector,
+				sub.index.vector,
+				sub.index.vector + 1
+			)
+		}
+        sub.index.vector <- index.vector[ myArgs == "-r" ]
+        if ( length( sub.index.vector ) > 0 ) {
+            parameters$gzfile <- FALSE
+            opt.vector <- c(
+                opt.vector,
+                sub.index.vector
+            )
+        }
+		sub.index.vector <- index.vector[ myArgs == "-v" ]
+		if ( length( sub.index.vector ) > 0 ) {
+			parameters$verbose <- TRUE
+# 			cat( "verbose mode on.\n" )
+			opt.vector <- c(
+				opt.vector,
+				sub.index.vector
+			)
+		}
+		if ( length( opt.vector ) == 0 ) parameters$data.files <- myArgs
+		else parameters$data.files <- myArgs[ -opt.vector ]
+
+	} else {
+
+		cat( "\nyou may have neglected to provide input.\n" )
+		parameters$helpme <- TRUE
+
+	}
+
+	return( parameters )
+
+}
+
+options( "warn" = 1 )
+
+myArgs <- commandArgs( TRUE )
+
+parameters <- parse_command_line( myArgs )
+
+if ( length( parameters$data.files ) > 0 && !parameters$helpme ) {
+
+	if ( parameters$corrfile != "" ) {
+
+		corr.data <- load( parameters$corrfile )
+		corr.mat <- get( corr.data[ 1 ] )
+
+		for ( data.file in parameters$data.files ) {
+            if ( parameters$gzfile ) {
+                mydata = read.table( gzfile( data.file ), header=parameters$header, sep='\t' )
+            } else {
+                mydata = read.table( data.file, header=parameters$header, sep='\t' )
+            }
+			repr.list <- myprune( mydata[,1], corr.mat, parameters$rsq, parameters$mode, parameters$verbose )
+			write.table( repr.list, quote=F, row.names=F, col.names=F )
+		}
+
+	}
+
+} else if ( !parameters$helpme ) {
+
+	cat( "\nyou may have neglected to provide input.\n" )
+	parameters$helpme <- TRUE
+
+}
+
+if ( parameters$helpme ) {
+
+	print_help_message( parameters )
+
+}
+

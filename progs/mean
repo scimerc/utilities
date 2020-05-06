@@ -1,0 +1,17 @@
+#!/usr/bin/perl
+# computes the mean of the given values
+use strict;
+use warnings;
+
+my $cnt = 0;
+my $sum = 0.;
+while ( my $number = <> )
+{
+	if ( $number =~ /^[.]*[0-9]+[eE]*[0-9]*$/ or $number =~ /^[0-9]+[.]*[0-9]+[eE]*[0-9]*$/ )
+	{
+		$sum += $number;
+		$cnt++;
+	}
+}
+print $sum / $cnt;
+print "\n";

@@ -1,0 +1,10 @@
+#!/usr/bin/env Rscript
+basedir = '/cluster/projects/p33/groups/biostat/software'
+source ( paste0( basedir, "/lib/R/nucleocode.R" ) )
+source ( paste0( basedir, "/lib/R/genotype.R" ) )
+mymap <- read.table ( "stdin", header = FALSE )
+bad.alleles <- subset (
+	mymap, nucleocode ( mymap$V5 ) == comp.nucleocode ( mymap$V6 )
+)
+write.table ( bad.alleles$V2, quote = F, sep = "\t", row.names = F, col.names = F )
+

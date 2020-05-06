@@ -1,0 +1,129 @@
+#!/usr/bin/env Rscript
+library( HiClimR )
+# print help message
+# - parameters: list of (default) parameters
+print_help_message <- function ( parameters ) {
+
+    cat( "\ncompute a correlation matrix for a given set of genotype dosages." )
+    cat( "\nfor each dosage file received the program will write an R-data file containing the" )
+    cat( "\ncorresponding correlation matrix.\n" )
+    cat( "\n USAGE:\n" )
+    cat( "\n  mydosecorr.Rscript [options] <dosage file(s)>\n" )
+    cat( "\n OPTIONS:\n\n" )
+    cat( "    -help           print help and exit;\n" )
+    cat( "    -h              expect header in file;\n" )
+    cat( "    -o              output prefix [default='corr'];\n" )
+    cat( "    -r              human readable file expected [default=gzip];\n" )
+    cat( "\n" )
+}
+
+# parse command line arguments
+# - myArgs: the command line arguments
+# returns a list of parameters
+parse_command_line <- function ( myArgs=NULL ) {
+
+	parameters <- list(
+
+        helpme = FALSE,
+        gzfile = TRUE,
+        header = FALSE,
+		outprefix = 'corr.RData'
+
+	)
+
+	if ( length( myArgs ) > 0 ) {
+
+		opt.vector <- vector()
+		index.vector <- 1 : length( myArgs )
+
+        sub.index.vector <- index.vector[ myArgs == "-help" ]
+		if ( length( sub.index.vector ) > 0 ) {
+			parameters$helpme <- TRUE
+			opt.vector <- c(
+				sub.index.vector
+			)
+		}
+
+        sub.index.vector <- index.vector[ myArgs == "-h" ]
+        if ( length( sub.index.vector ) > 0 ) {
+            parameters$header <- TRUE
+            opt.vector <- c(
+                opt.vector,
+                sub.index.vector
+            )
+        }
+
+        sub.index.vector <- index.vector[ myArgs == "-o" ]
+        if ( length( sub.index.vector ) > 0 ) {
+            parameters$outprefix <- myArgs[ sub.index.vector[ length( sub.index.vector ) ] + 1 ]
+            opt.vector <- c(
+                opt.vector,
+                sub.index.vector,
+                sub.index.vector + 1
+            )
+        }
+
+        sub.index.vector <- index.vector[ myArgs == "-r" ]
+        if ( length( sub.index.vector ) > 0 ) {
+            parameters$gzfile <- FALSE
+            opt.vector <- c(
+                opt.vector,
+                sub.index.vector
+            )
+        }
+
+        sub.index.vector <- index.vector[ myArgs == "-v" ]
+        if ( length( sub.index.vector ) > 0 ) {
+            parameters$verbose <- TRUE
+#           cat( "verbose mode on.\n" )
+            opt.vector <- c(
+                opt.vector,
+                sub.index.vector
+            )
+        }
+
+		if ( length( opt.vector ) == 0 ) parameters$data.files <- myArgs
+		else parameters$data.files <- myArgs[ -opt.vector ]
+
+	} else {
+
+		cat( "\nyou may have neglected to provide input.\n" )
+		parameters$helpme <- TRUE
+
+	}
+
+	return( parameters )
+
+}
+
+options( "warn" = 1 )
+
+myArgs <- commandArgs( TRUE )
+
+parameters <- parse_command_line( myArgs )
+
+if ( length( parameters$data.files ) > 0 && !parameters$helpme ) {
+
+	for ( data.file in parameters$data.files ) {
+        if ( parameters$gzfile ) {
+            mydata = read.table( gzfile( data.file ), header=parameters$header, sep='\t' )
+        } else {
+            mydata = read.table( data.file, header=parameters$header, sep='\t' )
+        }
+        corr.mat <- t( fastCor( t( mydata[, 4 : dim(mydata)[2] ] ), upperTri=T ) )
+        save( corr.mat, file = parameters$outprefix )
+	}
+
+} else if ( !parameters$helpme ) {
+
+	cat( "\nyou may have neglected to provide input.\n" )
+	parameters$helpme <- TRUE
+
+}
+
+if ( parameters$helpme ) {
+
+	print_help_message( parameters )
+
+}
+
