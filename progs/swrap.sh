@@ -1,7 +1,7 @@
 #!/bin/bash
 # script for submitting a generic job to slurm
-basedir="/cluster/projects/p33"
-opt_parser="${basedir}/groups/biostat/software/lib/sh/opt_parser.sh"
+declare -r basedir="$( cd "$( dirname $0 )" && cd .. && pwd )"
+opt_parser="${basedir}/lib/sh/opt_parser.sh"
 opt_list=("-name=" "-cmemo=" "-ctime=" "-ncpus=" "-sdep=" "-sdir=" "-skeep" "-smod=" "-sout=" "-squeue=")
 get_opt ()
 {
@@ -80,7 +80,7 @@ if [ $n -eq 0 ] ; then
   echo -e "   --squeue <queue_name>   submit job to the named queue [default: ${qname_def}]"
   echo -e "\n WARNING:"
   echo -e "   if the PROGRAM string contains command line options like the ones $(basename $0)"
-  echo -e "   uses, they will interpreted by $(basename $0) and will not be available to PROGRAM."
+  echo -e "   uses, they will be interpreted by $(basename $0) and won't be available to PROGRAM."
   echo -e "   a work around in such cases is to wrap the original PROGRAM string into a script"
   echo -e "   and replace PROGRAM with a call to that script."
   echo
@@ -95,14 +95,6 @@ if [ -z "${resultdir}" ] ; then
   tmpdir=$( readlink -f ${currdir} )
 elif [ -d "${resultdir}" ] ; then
   tmpdir=$( readlink -f ${resultdir} )
-fi
-
-if [[ "${tmpdir}" != "$( readlink -e ${basedir} )"* ]] ; then
-
-  echo "invalid working directory '${tmpdir}'."
-  echo "nothing done."
-  exit 0
-
 fi
 
 mkdir -p ${tmpdir}
@@ -126,13 +118,7 @@ for k in $( seq $(( n - 1 )) ) ; do
   if [[ -f "${scomm[$k]}" ]] ; then
     echo -n "expanded '${scomm[$k]}' to "
     scomm[$k]=$( readlink -e ${scomm[$k]} )
-    if [[ "$( readlink -e ${scomm[$k]} )" != "$( readlink -e ${basedir} )"* ]] ; then
-      # remove eventual leading root '/' from path
-      escomm[$k]=${scomm[$k]#/}
-    else
-      # use command word as is
-      escomm[$k]=${scomm[$k]}
-    fi
+    escomm[$k]=${scomm[$k]}
     echo "'${scomm[$k]}'."
   fi
 done
@@ -172,25 +158,6 @@ if [[ "${smodules}" != "" ]] ; then
 fi
 
 escomm[0]=$( readlink -f ${myprogpath} )
-if [[ "$( readlink -f ${myprogpath} )" != "$( readlink -f ${basedir} )"* ]] ; then
-  cp -v $( readlink -f ${myprogpath} ) ${tmpdir}/
-  echo cp -v ${myprogname} '${SCRATCH}'/ >> ${tmpscript}
-  echo chmod u+x '${SCRATCH}'/${myprogname} >> ${tmpscript}
-  escomm[0]='${SCRATCH}'/${myprogname}
-fi
-
-# copy everything that exists
-for k in $( seq ${#slist[@]} ) ; do
-  if [[ -f "${slist[$k]}" ]] ; then
-    if [[ "$( readlink -f ${slist[$k]} )" != "$( readlink -f ${basedir} )"* ]] ; then
-      echo "copying '${slist[$k]}'.."
-      slist[$k]=$( readlink -e ${slist[$k]} )
-      sdir='${SCRATCH}'/$( dirname ${slist[$k]} )
-      echo mkdir -v -p ${sdir} >> ${tmpscript}
-      echo cp -v -r ${slist[$k]} ${sdir}/ >> ${tmpscript}
-    fi
-  fi
-done
 
 # echo chkfile \"'${SCRATCH}'/${outprefix}*\" >> ${tmpscript}
 
