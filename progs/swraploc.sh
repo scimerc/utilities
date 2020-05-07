@@ -55,7 +55,7 @@ if [ $n -eq 0 ] ; then
   echo -e "   --sdir <directory>      result directory; must be in '/cluster/projects/p33'"
   echo -e "                           [default: current directory]"
   echo -e "   --skeep                 keep temporary script [deleted by default]"
-  echo -e "   --smod <modules>        comma separated list of modules to load' [default: none]"
+  echo -e "   --smod <modules>        comma separated list of modules to load [default: none]"
   echo -e "   --sout <output prefix>  output prefix [default: 'out']"
   echo
 
