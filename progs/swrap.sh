@@ -8,8 +8,6 @@ get_opt ()
   case $1 in
     "-name" )
       jobname=`echo "$2" | sed "s/^=\+//"` ;;
-    "-ncpus" )
-      ncpus=`echo "$2" | sed "s/^=\+//"` ;;
     "-cmemo" )
       cpumemo=`echo "$2" | sed "s/^=\+//"` ;;
     "-ctime" )
@@ -57,7 +55,7 @@ if [ $n -eq 0 ] ; then
   echo -e "   $(basename $0) [OPTIONS] PROGRAM"
   echo -e "\n OPTIONS:"
   echo -e "   --name <jobname>        name of the job [default: slurmjob]"
-  echo -e "   --cmemo <memory>        ram (use MB,GB,etc.) [default: ${cpumemo_def}]"
+  echo -e "   --cmemo <memory>        ram (use MB,GB,etc.) per cpu [default: ${cpumemo_def}]"
   echo -e "   --ctime <time>          time (format [D-]HH:MM:SS) [default: ${cputime_def}]"
   echo -e "   --ncpus <n>             number of cpus to be used [default: ${ncpus_def}]"
   echo -e "   --sdep <dependencies>   comma separated list of dependencies: files to be copied to"
