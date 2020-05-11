@@ -145,21 +145,22 @@ echo "#SBATCH --mem-per-cpu=${cpumemo}" >> ${tmpscript}
 echo "#SBATCH --cpus-per-task=${ncpus}" >> ${tmpscript}
 echo "#SBATCH --time=${cputime}" >> ${tmpscript}
 
-echo "source /cluster/bin/jobsetup" >> ${tmpscript}
-echo "set -o errexit # exit on errors" >> ${tmpscript}
-echo "module purge # clear any inherited modules" >> ${tmpscript}
+echo "set -o errexit  # exit on errors" >> ${tmpscript}
+echo "module --quiet purge  # clear any inherited modules" >> ${tmpscript}
 if [[ "${smodules}" != "" ]] ; then
   for module in $( echo ${smodules} | tr ',' ' ' ) ; do
     echo "module load ${module}" >> ${tmpscript}
   done
 fi
+echo "module list  # list loaded modules" >> ${tmpscript}
+echo echo >> ${tmpscript}
 
 escomm[0]=$( readlink -f ${myprogpath} )
 
-# echo chkfile \"'${SCRATCH}'/${outprefix}*\" >> ${tmpscript}
-
+echo echo -e Job ID: '${SLURM_JOB_ID}'\n >> ${tmpscript}
 echo cd '${SCRATCH}' >> ${tmpscript}
 echo ls -la >> ${tmpscript}
+echo echo >> ${tmpscript}
 echo ${escomm[@]} >> ${tmpscript}
 echo >> ${tmpscript}
 
