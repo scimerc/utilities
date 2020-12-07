@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+
+# exit on error
+set -ETeuo pipefail
+
+opt_header=false
+opt_footer=false
+while getopts "hf" opt; do
+  [ "${opt}" == "h" ] && opt_header=true
+  [ "${opt}" == "f" ] && opt_footer=true
+done
+shift $((OPTIND-1))
+
+asciitab=$(
+  cat "${@:-/dev/stdin}" \
+    | column -t -s $'\t' -o ' | ' \
+    | sed 's/^ \+//g; s/ \+$//g;'
+)
+headertab=$( printf "${asciitab}" | head -n 1 )
+bodytab=$( printf "${asciitab}" | tail -n +2 )
+
+separator="${headertab//[!|]/-}"
+
+echo "${headertab}"
+
+${opt_header} && echo "${separator}"
+
+echo "${bodytab}"
+
+${opt_footer} && echo "${separator}"
+
