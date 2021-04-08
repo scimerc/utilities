@@ -61,7 +61,7 @@ if [ $n -eq 0 ] ; then
   echo -e "   --sdep <dependencies>   comma separated list of dependencies: files to be copied to"
   echo -e "                           the cluster."
   echo -e "                           NOTE: all (existing) files entering the PROGRAM string are"
-  echo -e "                                 copied by default; use this option only your job"
+  echo -e "                                 copied by default; use this option only if your job"
   echo -e "                                 implicitly requires other files that are not directly"
   echo -e "                                 accessible from the cluster; implicitly required"
   echo -e "                                 files, e.g. within a script, that *are* directly"
