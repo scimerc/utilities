@@ -1,7 +1,7 @@
 #!/bin/bash
 # script for submitting a generic job to slurm
-basedir="/cluster/projects/p33"
-opt_parser="${basedir}/software/lib/sh/opt_parser.sh"
+declare -r basedir="$( cd "$( dirname $0 )" && cd .. && pwd )"
+opt_parser="${basedir}/lib/sh/opt_parser.sh"
 opt_list=("-name=" "-cmemo=" "-ctime=" "-sdep=" "-sdir=" "-skeep" "-smod=" "-sout=")
 get_opt ()
 {
@@ -45,18 +45,17 @@ if [ $n -eq 0 ] ; then
   echo -e "   $(basename $0) [OPTIONS] PROGRAM"
   echo -e "\n OPTIONS:"
   echo -e "   --name <jobname>        name of the job [default: slurmjob]"
-  echo -e "   --cmemo <memory>        memory requirement (use MB,GB,etc.) [default: 8GB]"
-  echo -e "   --ctime <time>          time requirement (format [D-]HH:MM:SS) [default: 05:00:00]"
+  echo -e "   --cmemo <memory>        ram (use MB,GB,etc.) per cpu [default: ${cpumemo_def}]"
+  echo -e "   --ctime <time>          time (format [D-]HH:MM:SS) [default: ${cputime_def}]"
   echo -e "   --sdep <dependencies>   comma separated list of dependencies: files to be copied to"
   echo -e "                           the cluster. NOTE: all files mentioned in PROGRAM are copied"
   echo -e "                           by default; use this option only if your job implicitly"
   echo -e "                           requires other files that are not directly accessible from"
   echo -e "                           the cluster."
-  echo -e "   --sdir <directory>      result directory; must be in '/cluster/projects/p33'"
-  echo -e "                           [default: current directory]"
+  echo -e "   --sdir <directory>      result directory [default: current directory]"
   echo -e "   --skeep                 keep temporary script [deleted by default]"
   echo -e "   --smod <modules>        comma separated list of modules to load [default: none]"
-  echo -e "   --sout <output prefix>  output prefix [default: 'out']"
+  echo -e "   --sout <output prefix>  chkfile output prefix [default: 'out']"
   echo
 
   exit 0
