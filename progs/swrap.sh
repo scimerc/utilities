@@ -2,7 +2,19 @@
 # script for submitting a generic job to slurm
 declare -r basedir="$( cd "$( dirname $0 )" && cd .. && pwd )"
 opt_parser="${basedir}/lib/sh/opt_parser.sh"
-opt_list=("-name=" "-cmemo=" "-ctime=" "-ncpus=" "-sdep=" "-sdir=" "-skeep" "-smod=" "-sout=" "-squeue=")
+opt_list=( \
+  "-help" \
+  "-name=" \
+  "-cmemo=" \
+  "-ctime=" \
+  "-ncpus=" \
+  "-sdep=" \
+  "-sdir=" \
+  "-skeep" \
+  "-smod=" \
+  "-sout=" \
+  "-squeue="
+)
 get_opt ()
 {
   case $1 in
