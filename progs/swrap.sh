@@ -59,7 +59,7 @@ partitions=""
 qname_def="p22_tsd"
 qname="${qname_def}"
 resultdir=""
-tmpargs=$( mktemp .tmpXXXXXXXX )
+tmpargs=$( mktemp )
 source ${opt_parser} > ${tmpargs}
 scomm=( $( cat ${tmpargs} ) )
 rm -f ${tmpargs}
