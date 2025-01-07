@@ -19,6 +19,8 @@ opt_list=( \
 get_opt ()
 {
   case $1 in
+    "-help" )
+      help=true ;;
     "-name" )
       jobname=`echo "$2" | sed "s/^=\+//"` ;;
     "-cmemo" )
@@ -47,6 +49,7 @@ cpumemo_def="100MB"
 cpumemo="${cpumemo_def}"
 cputime_def="00:15:00"
 cputime="${cputime_def}"
+help=false
 ncpus_def=1
 ncpus="${ncpus_def}"
 jobname="slurmjob"
@@ -63,9 +66,9 @@ scomm=( $( cat ${tmpargs} ) )
 rm -f ${tmpargs}
 n=${#scomm[@]}
 
-if [ $n -eq 0 ] ; then
+if ${help} || [[ $n -eq 0 ]] ; then
 
-  echo "no program specified."
+  ${help} || echo "no program specified."
 
   echo -e "\n USAGE:"
   echo -e "   $(basename $0) [OPTIONS] PROGRAM"
