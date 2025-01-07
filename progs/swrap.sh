@@ -13,6 +13,7 @@ opt_list=( \
   "-skeep" \
   "-smod=" \
   "-sout=" \
+  "-spart=" \
   "-squeue="
 )
 get_opt ()
@@ -36,6 +37,8 @@ get_opt ()
       smodules=`echo "$2" | sed "s/^=\+//"` ;;
     "-sout" )
       outprefix=`echo "$2" | sed "s/^=\+//"` ;;
+    "-spart" )
+      partitions=`echo "$2" | sed "s/^=\+//"` ;;
     "-squeue" )
       qname=`echo "$2" | sed "s/^=\+//"` ;;
   esac
@@ -50,6 +53,7 @@ jobname="slurmjob"
 keeptmp=0
 outprefix="out"
 qname_def="nn9114k"
+partitions=""
 qname="${qname_def}"
 resultdir=""
 sdepend=""
@@ -83,6 +87,7 @@ if [ $n -eq 0 ] ; then
   echo -e "   --skeep                 keep temporary script [deleted by default]"
   echo -e "   --smod <modules>        comma separated list of modules to load [default: none]"
   echo -e "   --sout <output prefix>  chkfile output prefix [default: 'out']"
+  echo -e "   --spart <p0>,<p1>...    comma-separated list of viable partitions [default: none]"
   echo -e "   --squeue <name>         submit job for this account [default: ${qname_def}]"
   echo -e "                           NOTE: this option is currently disabled; use absolute paths"
   echo -e "                                 to ensure that the output files are written at the"
@@ -156,6 +161,9 @@ echo "#SBATCH --job-name=${jobname}" >> ${tmpscript}
 echo "#SBATCH --mem-per-cpu=${cpumemo}" >> ${tmpscript}
 echo "#SBATCH --cpus-per-task=${ncpus}" >> ${tmpscript}
 echo "#SBATCH --time=${cputime}" >> ${tmpscript}
+if [[ "${partitions}" != "" ]] ; then
+  echo "#SBATCH --partition=${partitions}" >> ${tmpscript}
+fi
 
 echo "set -o errexit  # exit on errors" >> ${tmpscript}
 echo "module --quiet purge  # clear any inherited modules" >> ${tmpscript}
