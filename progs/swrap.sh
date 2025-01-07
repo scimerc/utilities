@@ -156,8 +156,8 @@ tmpscript=$( mktemp --tmpdir=${tmpdir} ".tmpsXXXXX.sh" )
 echo "#!/bin/bash" > ${tmpscript}
 
 echo "#SBATCH --account=${qname}" >> ${tmpscript}
-echo "#SBATCH --job-name=${jobname}" >> ${tmpscript}
 echo "#SBATCH --cpus-per-task=${ncpus}" >> ${tmpscript}
+echo "#SBATCH --job-name=${jobname}" >> ${tmpscript}
 echo "#SBATCH --time=${cputime}" >> ${tmpscript}
 if [[ "${cpumemo}" != "" ]] ; then
   echo "#SBATCH --mem-per-cpu=${cpumemo}" >> ${tmpscript}
