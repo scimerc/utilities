@@ -30,7 +30,7 @@ get_opt ()
     "-ncpus" )
       ncpus=`echo "$2" | sed "s/^=\+//"` ;;
     "-sdep" )
-      sdepend=`echo "$2" | sed "s/^=\+//"` ;;
+      depend=`echo "$2" | sed "s/^=\+//"` ;;
     "-sdir" )
       resultdir=`echo "$2" | sed "s/^=\+//"` ;;
     "-skeep" )
@@ -49,6 +49,7 @@ cpumemo_def="100MB"
 cpumemo="${cpumemo_def}"
 cputime_def="00:15:00"
 cputime="${cputime_def}"
+depend=""
 help=false
 ncpus_def=1
 ncpus="${ncpus_def}"
@@ -59,7 +60,6 @@ qname_def="nn9114k"
 partitions=""
 qname="${qname_def}"
 resultdir=""
-sdepend=""
 tmpargs=$( mktemp .tmpXXXXXXXX )
 source ${opt_parser} > ${tmpargs}
 scomm=( $( cat ${tmpargs} ) )
@@ -141,18 +141,18 @@ for k in $( seq $(( n - 1 )) ) ; do
 done
 
 slist=( ${scomm[@]} )
-if [[ "${sdepend}" != "" ]] ; then
+if [[ "${depend}" != "" ]] ; then
   k=0
-  for dfile in $( echo ${sdepend} | tr ',' ' ' ) ; do
+  for dfile in $( echo ${depend} | tr ',' ' ' ) ; do
     if [[ -f "${dfile}" ]] ; then
       echo "parsing dependency '${dfile}'.."
-      sdependarr[$k]=$( readlink -e ${dfile} )
+      dependarr[$k]=$( readlink -e ${dfile} )
       k=$(( k + 1 ))
     fi
   done
   # merge the rest with the non explicit dependencies
-  slist=( $( printf "%s\n" ${scomm[@]} ${sdependarr[@]} | sort -u ) )
-  echo -e "parsed dependencies:\n${slist[@]}"
+  slist=( $( printf "%s\n" ${scomm[@]} ${dependarr[@]} | sort -u ) )
+  echo -e "parsed dependencies:\n  ${slist[@]}"
 fi
 
 tmpscript=$( mktemp --tmpdir=${tmpdir} ".tmpsXXXXX.sh" )
