@@ -114,8 +114,7 @@ fi
 mkdir -p ${tmpdir}
 
 escomm=( ${scomm[@]} )
-echo -e "parsed command:\n'${scomm[@]}'."
-echo -e "submitting command:\n'${escomm[@]}'."
+echo -e "parsed command:\n  '${scomm[@]}'."
 myprog=${scomm[0]} # the program name is first
 
 # the program receives special treatment
