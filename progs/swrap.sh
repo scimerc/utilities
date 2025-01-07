@@ -45,8 +45,7 @@ get_opt ()
       qname=`echo "$2" | sed "s/^=\+//"` ;;
   esac
 }
-cpumemo_def="100MB"
-cpumemo="${cpumemo_def}"
+cpumemo=""
 cputime_def="00:15:00"
 cputime="${cputime_def}"
 depend=""
@@ -161,9 +160,11 @@ echo "#!/bin/bash" > ${tmpscript}
 
 echo "#SBATCH --account=${qname}" >> ${tmpscript}
 echo "#SBATCH --job-name=${jobname}" >> ${tmpscript}
-echo "#SBATCH --mem-per-cpu=${cpumemo}" >> ${tmpscript}
 echo "#SBATCH --cpus-per-task=${ncpus}" >> ${tmpscript}
 echo "#SBATCH --time=${cputime}" >> ${tmpscript}
+if [[ "${cpumemo}" != "" ]] ; then
+  echo "#SBATCH --mem-per-cpu=${cpumemo}" >> ${tmpscript}
+fi
 if [[ "${partitions}" != "" ]] ; then
   echo "#SBATCH --partition=${partitions}" >> ${tmpscript}
 fi
